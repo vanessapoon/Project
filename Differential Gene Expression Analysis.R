@@ -20,7 +20,7 @@ samples
 library(tximport)
 library(GenomicFeatures)
 
-#no spaces in genomic features package so change variable type and rename
+#no spaces when using genomic features package so change variable type and rename
 samples$Tissue <- as.factor(samples$Tissue)
 samples$Tissue <- factor(samples$Tissue, labels = c("liver", "macrophage"))
 
@@ -47,13 +47,13 @@ results(dds, contrast = c("group", "macrophage.Cirrhosis", "macrophage.Control")
   as.data.frame() %>%
   filter(padj<0.05)
 
-BiocManager::install("AnnotationDbi")
-BiocManager::install("org.Hs.eg.db")  
+# BiocManager::install("AnnotationDbi")
+# BiocManager::install("org.Hs.eg.db")  
 library(AnnotationDbi)
 library(org.Hs.eg.db)
 
 #add column with gene symbols to results data frame
-res <- res %>% 
+res <- results(dds, contrast = c("group", "macrophage.Cirrhosis", "macrophage.Control")) %>%
   as.data.frame() %>%
   mutate(gene_id = rownames(dds)) %>%
   mutate(Symbol = mapIds(
@@ -63,12 +63,13 @@ res <- res %>%
     column = "SYMBOL"
   )) 
 
-install.packages("Hmisc")
-install.packages("pheatmap")
+# install.packages("Hmisc")
+# install.packages("pheatmap")
 library(Hmisc)
 library(pheatmap)
 
-#correlation of samples
+#heatmap to show correlation of samples
+col.data <- samples
 corr.mat <- Hmisc::rcorr(counts(dds))
 pheatmap::pheatmap(corr.mat$r, annotation_col = col.data)
 
