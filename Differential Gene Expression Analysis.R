@@ -18,7 +18,6 @@ row.names(samples) <- samples$Run
 samples
 
 library(tximport)
-
 library(GenomicFeatures)
 
 #no spaces in genomic features package so change variable type and rename
@@ -53,7 +52,8 @@ BiocManager::install("org.Hs.eg.db")
 library(AnnotationDbi)
 library(org.Hs.eg.db)
 
-res <- res %>%
+#add column with gene symbols to results data frame
+res <- res %>% 
   as.data.frame() %>%
   mutate(gene_id = rownames(dds)) %>%
   mutate(Symbol = mapIds(
@@ -62,3 +62,15 @@ res <- res %>%
     keytype = "ENSEMBL",
     column = "SYMBOL"
   )) 
+
+install.packages("Hmisc")
+install.packages("pheatmap")
+library(Hmisc)
+library(pheatmap)
+
+#correlation of samples
+corr.mat <- Hmisc::rcorr(counts(dds))
+pheatmap::pheatmap(corr.mat$r, annotation_col = col.data)
+
+#dispersion statistics and correction that DESeq2 applies
+plotDispEsts(dds)
