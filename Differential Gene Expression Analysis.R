@@ -75,9 +75,6 @@ res <- results(dds, contrast = c("group", "macrophage.Cirrhosis", "macrophage.Co
   )) 
 
 #looking at multiple genes
-genes <- c("TNF", "MMP9", "TIMP1", "IL10", "IL1A", "PDGFA")
-res %>% filter(Symbol%in%genes)
-
 genes <- c("GREM1", "NOG", "BMP4", "BMP7", "TGFB1", "CHRD", "BMP2")
 res %>% filter(Symbol%in%genes)
 
