@@ -12,8 +12,11 @@ names(results_all) <- plyr::mapvalues(x = names(results_all), from = "GSE146028_
 
 datasets <- read.delim("Datasets.txt")
 
-sub <- datasets$ID [c(1,3,5,8)]
+# sub <- datasets$ID [- c(2,4,6,7)]
+sub <- datasets$ID
 
+
+#creates new lists of just log2FC and padj from results_all
 lfc <- list()
 for (i in sub){
   lfc[[i]] <- results_all[[i]]$log2FoldChange
@@ -35,16 +38,24 @@ rownames(padj_df) <- genes
 library(org.Hs.eg.db)
 Symbol <- AnnotationDbi::mapIds(org.Hs.eg.db, keys = substr(genes, 1, 15), keytype = "ENSEMBL", column = "SYMBOL")
 
-targets <- c("CHRD", "CHRDL1", "DAND5", "FST", "FSTL1", "FSTL3", "GREM1", "GREM2", "NBL1", "NOG", "SOST", "SOSTDC1", "TWSG1")
+# selected gene targets
+# classic m1/ m2 markers
+targets  <- c("TNF", "IL6", "NOS2", "IL12B", "IL23A", "CXCL9", "CXCL10", "CXCL11", "IL10", "ARG1", "CCL17", "CCL22", "TGFB1") 
+# bmp antagonists 
+# targets <- c("CHRD", "CHRDL1", "DAND5", "FST", "FSTL1", "FSTL3", "GREM1", "GREM2", "NBL1", "NOG", "SOST", "SOSTDC1", "TWSG1")
+# bmps 
 # targets <- c("BMP2", "BMP4", "BMP7", "BMPR1A", "BMPR1B", "BMPR2", "BMPER", "ENG", "MIF", "CD44", "CD74", "MIF", "KDR")
 
-# heatmap for BMP antagonists 
+# targets <- c("GREM1")
+
+#heatmap for selected genes
+#column number needs to match number of datsets for pivot_longer
 lfc_select <- lfc_df [Symbol %in% targets, ]
 rownames(lfc_select) <- Symbol [Symbol %in% targets]
-lfc_long <- lfc_select %>% mutate(gene_id = factor(rownames(lfc_select))) %>% pivot_longer(cols = 1:3)
+lfc_long <- lfc_select %>% mutate(gene_id = factor(rownames(lfc_select))) %>% pivot_longer(cols = 1:8)
 padj_select <- padj_df [Symbol %in% targets, ]
 rownames(padj_select) <- Symbol [Symbol %in% targets]
-padj_long <- padj_select %>% mutate(gene_id = rownames(padj_select)) %>% pivot_longer(cols = 1:3)
+padj_long <- padj_select %>% mutate(gene_id = rownames(padj_select)) %>% pivot_longer(cols = 1:8)
 padj_long$value [is.na(padj_long$value)] <- 1
 
 lfc_long$padj <- padj_long$value
@@ -56,10 +67,10 @@ lfc_long$signif <- case_when(
 
 max <- max(abs(lfc_long$value), na.rm = T)
 p1 <- lfc_long %>% 
-  ggplot(aes(x = name, y = gene_id, fill = value))+
+  ggplot(aes(x = factor(name, level = c("GSE100382_LPS", "GSE135753_LPS", "GSE163165_LPS", "GSE98368_IFNg", "GSE146028_IFNg.LPS", "GSE132732_IL4", "GSE146028_IL4", "GSE123603_IL4")), y = gene_id, fill = value))+
   geom_tile()+
   geom_text(aes(label = signif))+
-  labs(title = "Differential gene expression of BMP antagonists in LPS stimulated macrophages", x ="", y = "", 
+  labs(title = "Expression of classical markers", x ="", y = "", 
        fill = expression(paste("log" [2], "-fc")))+
   scale_fill_distiller(type = "div", palette = "RdBu", limits = c(-max, max)) +
   scale_y_discrete(limits = rev(levels(lfc_long$gene_id)))+
@@ -77,16 +88,145 @@ p1 <- lfc_long %>%
         axis.text.y = element_text(size=10, face = "bold"))
 p1
 
-# pdf(file = "DEG analysis for BMP antagonists in HSC.pdf", width=5, height=5)
-# p1
-# dev.off()
+#install.packages("corrplot")
 
-# check for correlation of datasets ####
+#check for correlation of datasets
 lfc_mat <- as.matrix(lfc_select)
 corrmat <- Hmisc::rcorr(lfc_mat)
 
-install.packages("corrplot"")
 corrplot::corrplot(corrmat$r)
 
 pheatmap::pheatmap(corrmat$r)
+
+
+# META FOR LPS
+library(metaRNASeq)
+subLPS <- datasets$ID[datasets$Treatment == "LPS"]
+
+results_meta <- list()
+
+for(i in subLPS){  
+  results_meta[[i]] <- results_all[[i]]
+}
+
+rawpval <- list()
+FC <- list()
+adjpval <- list()
+
+for(i in names(results_meta)){
+  rawpval[[i]] <- results_meta[[i]]$pvalue
+  FC[[i]] <- results_meta[[i]]$log2FoldChange
+  adjpval[[i]] <- results_meta[[i]]$padj
+}
+
+DE_LPS <- mapply(adjpval, FUN = function(x) ifelse (x <= 0.05, 1, 0))
+
+filtered <- lapply(adjpval, FUN=function(pval) which(is.na(pval)))
+
+for(i in names(rawpval)){
+  rawpval[[i]][filtered[[i]]] <- NA
+}
+#correlation of datasets
+FC_mat <- data.frame(FC) %>% as.matrix()
+
+corrmat <- Hmisc::rcorr(FC_mat)
+pheatmap::pheatmap(corrmat$r)
+
+fishcomb_LPS <- fishercomb(rawpval, BHth = 0.05)
+sum(fishcomb_LPS$adjpval < 0.01, na.rm = T)
+
+#need to specify number of replicates for each study
+#LPS = 2,3,3 IL4 = 2,5,3
+invnormcomb_LPS <- invnorm(rawpval,nrep=c(2,3,3), BHth = 0.05)  #save separately
+sum(invnormcomb_LPS$adjpval < 0.01, na.rm = T) #save separately
+
+DEresults_LPS <- data.frame(DE_LPS,
+                        "DE.fishercomb"=ifelse(fishcomb_LPS$adjpval<=0.01,1,0),
+                        "DE.invnorm"=ifelse(invnormcomb_LPS$adjpval<=0.01,1,0)) #rename DEresults object
+head(DEresults_LPS)
+
+#remove contradictory differential expression
+signsFC <- mapply(FC, FUN=function(x) sign(x))
+sumsigns <- apply(signsFC, 1, sum)
+commonsgnFC <- ifelse(abs(sumsigns)==dim(signsFC)[2], sign(sumsigns), 0)
+
+signsFC <- mapply(FC, FUN=function(x) sign(x))
+signsFC[DE_LPS == 0] <- 0
+sumsigns <- apply(signsFC, 1, sum, na.rm = T)
+commonsgnFC <- ifelse(abs(sumsigns)==rowSums(DE_LPS, na.rm = T), sign(sumsigns), 0)
+
+sum(commonsgnFC !=0, na.rm =T)
+
+DEresults_LPS$commonsgn <- commonsgnFC
+
+# extract ENSEMBL IDs for DEGs, either all or only up/down-regulated genes
+DE_genes_all_LPS <- names(Symbol) [DEresults_LPS$DE.fishercomb == 1 & DEresults_LPS$DE.invnorm == 1 & DEresults_LPS$commonsgn!= 0 & !is.na(DEresults_LPS$commonsgn)]
+DE_genes_up_LPS <- names(Symbol) [DEresults_LPS$DE.fishercomb == 1 & DEresults_LPS$DE.invnorm == 1 & DEresults_LPS$commonsgn == 1 & !is.na(DEresults_LPS$commonsgn)]
+DE_genes_down_LPS <- names(Symbol) [DEresults_LPS$DE.fishercomb == 1 & DEresults_LPS$DE.invnorm == 1 & DEresults_LPS$commonsgn == -1 & !is.na(DEresults_LPS$commonsgn)]
+
+# META FOR IL4
+library(metaRNASeq)
+subIL4 <- datasets$ID[datasets$Treatment == "IL4"]
+results_meta <- list()
+
+for(i in subIL4){  
+  results_meta[[i]] <- results_all[[i]]
+}
+
+rawpval <- list()
+FC <- list()
+adjpval <- list()
+
+for(i in names(results_meta)){
+  rawpval[[i]] <- results_meta[[i]]$pvalue
+  FC[[i]] <- results_meta[[i]]$log2FoldChange
+  adjpval[[i]] <- results_meta[[i]]$padj
+}
+
+DE_IL4 <- mapply(adjpval, FUN = function(x) ifelse (x <= 0.05, 1, 0))
+
+filtered <- lapply(adjpval, FUN=function(pval) which(is.na(pval)))
+
+for(i in names(rawpval)){
+  rawpval[[i]][filtered[[i]]] <- NA
+}
+#correlation of datasets
+FC_mat <- data.frame(FC) %>% as.matrix()
+
+corrmat <- Hmisc::rcorr(FC_mat)
+pheatmap::pheatmap(corrmat$r)
+
+fishcomb_IL4 <- fishercomb(rawpval, BHth = 0.05)
+sum(fishcomb_IL4$adjpval < 0.01, na.rm = T)
+
+#need to specify number of replicates for each study
+#LPS = 2,3,3 IL4 = 2,5,3
+invnormcomb_IL4 <- invnorm(rawpval,nrep=c(2,5,3), BHth = 0.05)  #save separately
+sum(invnormcomb_IL4$adjpval < 0.01, na.rm = T) #save separately
+
+DEresults_IL4 <- data.frame(DE_IL4,
+                            "DE.fishercomb"=ifelse(fishcomb_IL4$adjpval<=0.01,1,0),
+                            "DE.invnorm"=ifelse(invnormcomb_IL4$adjpval<=0.01,1,0)) #rename DEresults object
+head(DEresults_IL4)
+
+#remove contradictory differential expression
+signsFC <- mapply(FC, FUN=function(x) sign(x))
+sumsigns <- apply(signsFC, 1, sum)
+commonsgnFC <- ifelse(abs(sumsigns)==dim(signsFC)[2], sign(sumsigns), 0)
+
+signsFC <- mapply(FC, FUN=function(x) sign(x))
+signsFC[DE_IL4 == 0] <- 0
+sumsigns <- apply(signsFC, 1, sum, na.rm = T)
+commonsgnFC <- ifelse(abs(sumsigns)==rowSums(DE_IL4, na.rm = T), sign(sumsigns), 0)
+
+sum(commonsgnFC !=0, na.rm =T)
+
+DEresults_IL4$commonsgn <- commonsgnFC
+
+# extract ENSEMBL IDs for DEGs, either all or only up/down-regulated genes
+DE_genes_all_IL4 <- names(Symbol) [DEresults_IL4$DE.fishercomb == 1 & DEresults_IL4$DE.invnorm == 1 & DEresults_IL4$commonsgn!= 0 & !is.na(DEresults_IL4$commonsgn)]
+DE_genes_up_IL4 <- names(Symbol) [DEresults_IL4$DE.fishercomb == 1 & DEresults_IL4$DE.invnorm == 1 & DEresults_IL4$commonsgn == 1 & !is.na(DEresults_IL4$commonsgn)]
+DE_genes_down_IL4 <- names(Symbol) [DEresults_IL4$DE.fishercomb == 1 & DEresults_IL4$DE.invnorm == 1 & DEresults_IL4$commonsgn == -1 & !is.na(DEresults_IL4$commonsgn)]
+
+#comparing meta and other 2 data sets
 
