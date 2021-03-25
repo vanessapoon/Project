@@ -1,4 +1,6 @@
 setwd("~/OneDrive - University of Birmingham/Year 3/Research Project/data") 
+# setwd("data")
+getwd()
 
 library(tidyverse)
 # install.packages("cowplot")
@@ -236,13 +238,13 @@ IFNgandLPS <- results_all$`GSE146028_IFNg+LPS`
 IFNg <-  IFNg %>% dplyr::select(log2FoldChange, padj) 
 
 #subsetting up and downregulated genes
-IFNg_up<- filter(IFNg, log2FoldChange > "0", !is.na(padj))
-IFNg_down <-  filter(IFNg, log2FoldChange < "0", !is.na(padj))
+IFNg_up<- filter(IFNg, log2FoldChange > 0, !is.na(padj))
+IFNg_down <-  filter(IFNg, log2FoldChange < 0, !is.na(padj))
 
 IFNgandLPS <- IFNgandLPS %>% dplyr::select(log2FoldChange, padj)
 
-IFNgandLPS_up <-  filter(IFNgandLPS, log2FoldChange > "0", !is.na(padj))
-IFNgandLPS_down <-  filter(IFNgandLPS, log2FoldChange < "0", !is.na(padj))
+IFNgandLPS_up <-  filter(IFNgandLPS, log2FoldChange > 0, !is.na(padj))
+IFNgandLPS_down <-  filter(IFNgandLPS, log2FoldChange < 0, !is.na(padj))
 
 library(AnnotationDbi)
 library(org.Hs.eg.db)
@@ -291,19 +293,19 @@ IFNgandLPS_down <- as.data.frame(IFNgandLPS_down) %>%
     keytype = "ENSEMBL",
     column = "SYMBOL"))
 
-IFNg_up_gene_list <- IFNg_up$genes [IFNg_up$padj < 0.05] 
+IFNg_up_gene_list <- IFNg_up$genes [IFNg_up$padj < 0.01] 
 IFNg_up_gene_list <- substr(IFNg_up_gene_list, 1, 15) 
 IFNg_up_gene_list
 
-IFNg_down_gene_list <- IFNg_down$genes [IFNg_down$padj < 0.05] 
+IFNg_down_gene_list <- IFNg_down$genes [IFNg_down$padj < 0.01] 
 IFNg_down_gene_list <- substr(IFNg_down_gene_list, 1, 15) 
 IFNg_down_gene_list
 
-IFNgandLPS_up_gene_list <- IFNgandLPS_up$genes [IFNgandLPS_up$padj < 0.05] 
+IFNgandLPS_up_gene_list <- IFNgandLPS_up$genes [IFNgandLPS_up$padj < 0.01] 
 IFNgandLPS_up_gene_list <- substr(IFNgandLPS_up_gene_list, 1, 15) 
 IFNgandLPS_up_gene_list
 
-IFNgandLPS_down_gene_list <- IFNgandLPS_down$genes [IFNgandLPS_down$padj < 0.05] 
+IFNgandLPS_down_gene_list <- IFNgandLPS_down$genes [IFNgandLPS_down$padj < 0.01] 
 IFNgandLPS_down_gene_list <- substr(IFNgandLPS_down_gene_list, 1, 15) 
 IFNgandLPS_down_gene_list
 
@@ -316,7 +318,8 @@ head(enr_GO)
 
 #barplot to show enriched pathways
 library(enrichplot)
-barplot(enr_GO, showCategory=10,  main = "Downregulated pathways in IFNg+LPS stimulated macrophages", xlab="Counts" )
+barplot(enr_GO, showCategory=10) +
+  labs(title = "Downregulated pathways in IFNg+LPS stimulated macrophages", y = "Counts")
 
 #adding gene symbols 
 LPS_invnorm <- as.data.frame(invnormcomb_LPS$adjpval) %>%
@@ -353,8 +356,8 @@ IL4_fish <- as.data.frame(fishcomb_IL4$adjpval) %>%
 
 # selecting minimum p values for all genes to show on heatmap 
 
-#DGE <- list()
-#saveRDS(DGE, file = "DGE.RDS")
+# DGE <- list()
+# saveRDS(DGE, file = "DGE.RDS")
 
 DGE <- readRDS("DGE.RDS")
 DGE[["IL4_fishcomb_padj"]] <-  fishcomb_IL4$adjpval
@@ -394,5 +397,10 @@ names(minpadj_df)[names(minpadj_df) == "apply(allpadj_df, 1, min, na.rm = TRUE)"
 
 minpadj_df <- minpadj_df %>% filter(minimum_padj > 0) %>% arrange(minimum_padj) %>% top_n(-1000)
 
+#creating a matrix of log2foldchagnes of top 1000 regulated genes for creating the overview heatmap
+matrix_heatmap_overview <- lfc_df [rownames(lfc_df) %in% rownames(minpadj_df), ] %>% as.matrix()
 
+pheatmap::pheatmap(matrix_heatmap_overview,
+                   show_rownames = FALSE,
+                   scale = "row")
 
