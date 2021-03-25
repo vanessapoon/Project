@@ -235,7 +235,7 @@ IFNgandLPS <- results_all$`GSE146028_IFNg+LPS`
 
 IFNg <-  IFNg %>% dplyr::select(log2FoldChange, padj) 
 
-#subsetting up and downregulated gene lists
+#subsetting up and downregulated genes
 IFNg_up<- filter(IFNg, log2FoldChange > "0", !is.na(padj))
 IFNg_down <-  filter(IFNg, log2FoldChange < "0", !is.na(padj))
 
@@ -267,7 +267,7 @@ IFNg_up <-as.data.frame(IFNg_up) %>%
     keytype = "ENSEMBL",
     column = "SYMBOL"))
 
-as.data.frame(IFNg_down) %>%
+IFNg_down <- as.data.frame(IFNg_down) %>%
   mutate(genes = rownames(IFNg_down)) %>%
   mutate(Symbol = mapIds(
     org.Hs.eg.db,
@@ -275,7 +275,7 @@ as.data.frame(IFNg_down) %>%
     keytype = "ENSEMBL",
     column = "SYMBOL"))
 
-as.data.frame(IFNgandLPS_up) %>%
+IFNgandLPS_up <- as.data.frame(IFNgandLPS_up) %>%
   mutate(genes = rownames(IFNgandLPS_up)) %>%
   mutate(Symbol = mapIds(
     org.Hs.eg.db,
@@ -283,7 +283,7 @@ as.data.frame(IFNgandLPS_up) %>%
     keytype = "ENSEMBL",
     column = "SYMBOL"))
 
-as.data.frame(IFNgandLPS_down) %>%
+IFNgandLPS_down <- as.data.frame(IFNgandLPS_down) %>%
   mutate(genes = rownames(IFNgandLPS_down)) %>%
   mutate(Symbol = mapIds(
     org.Hs.eg.db,
@@ -295,12 +295,104 @@ IFNg_up_gene_list <- IFNg_up$genes [IFNg_up$padj < 0.05]
 IFNg_up_gene_list <- substr(IFNg_up_gene_list, 1, 15) 
 IFNg_up_gene_list
 
+IFNg_down_gene_list <- IFNg_down$genes [IFNg_down$padj < 0.05] 
+IFNg_down_gene_list <- substr(IFNg_down_gene_list, 1, 15) 
+IFNg_down_gene_list
+
+IFNgandLPS_up_gene_list <- IFNgandLPS_up$genes [IFNgandLPS_up$padj < 0.05] 
+IFNgandLPS_up_gene_list <- substr(IFNgandLPS_up_gene_list, 1, 15) 
+IFNgandLPS_up_gene_list
+
+IFNgandLPS_down_gene_list <- IFNgandLPS_down$genes [IFNgandLPS_down$padj < 0.05] 
+IFNgandLPS_down_gene_list <- substr(IFNgandLPS_down_gene_list, 1, 15) 
+IFNgandLPS_down_gene_list
+
+
 library(clusterProfiler)
-enr_GO <- enrichGO(IFNg_up_gene_list, org.Hs.eg.db, keyType = "ENSEMBL", ont = "BP")
+
+enr_GO <- enrichGO(IFNgandLPS_down_gene_list, org.Hs.eg.db, keyType = "ENSEMBL", ont = "BP")
 enr_GO <- setReadable(enr_GO, org.Hs.eg.db, keyType = "ENSEMBL") #converting to gene symbols
 head(enr_GO)
 
-
+#barplot to show enriched pathways
 library(enrichplot)
-barplot(enr_GO, showCategory=10,  main = "Upregulated pathways in LPS stimulated pathways", xlab="Counts" )
+barplot(enr_GO, showCategory=10,  main = "Downregulated pathways in IFNg+LPS stimulated macrophages", xlab="Counts" )
+
+#adding gene symbols 
+LPS_invnorm <- as.data.frame(invnormcomb_LPS$adjpval) %>%
+  mutate(genes = rownames(invnormcomb_LPS$adjpval)) %>%
+  mutate(Symbol = mapIds(
+    org.Hs.eg.db,
+    keys = substr(genes, 1, 15),
+    keytype = "ENSEMBL",
+    column = "SYMBOL"))
+
+LPS_fish <- as.data.frame(fishcomb_LPS$adjpval) %>%
+  mutate(genes = rownames(fishcomb_LPS$adjpval)) %>%
+  mutate(Symbol = mapIds(
+    org.Hs.eg.db,
+    keys = substr(genes, 1, 15),
+    keytype = "ENSEMBL",
+    column = "SYMBOL"))
+
+IL4_invnorm <- as.data.frame(invnormcomb_IL4$adjpval) %>%
+  mutate(genes = rownames(invnormcomb_IL4$adjpval)) %>%
+  mutate(Symbol = mapIds(
+    org.Hs.eg.db,
+    keys = substr(genes, 1, 15),
+    keytype = "ENSEMBL",
+    column = "SYMBOL"))
+
+IL4_fish <- as.data.frame(fishcomb_IL4$adjpval) %>%
+  mutate(genes = rownames(DE_genes_all_IL4)) %>%
+  mutate(Symbol = mapIds(
+    org.Hs.eg.db,
+    keys = substr(genes, 1, 15),
+    keytype = "ENSEMBL",
+    column = "SYMBOL"))
+
+# selecting minimum p values for all genes to show on heatmap 
+
+#DGE <- list()
+#saveRDS(DGE, file = "DGE.RDS")
+
+DGE <- readRDS("DGE.RDS")
+DGE[["IL4_fishcomb_padj"]] <-  fishcomb_IL4$adjpval
+saveRDS(DGE, file = "DGE.RDS")
+
+DGE <- readRDS("DGE.RDS")
+DGE[["IL4_invnorm_padj"]] <-  invnormcomb_IL4$adjpval
+saveRDS(DGE, file = "DGE.RDS")
+
+DGE <- readRDS("DGE.RDS")
+DGE[["LPS_fishcomb_padj"]] <-  fishcomb_LPS$adjpval
+saveRDS(DGE, file = "DGE.RDS")
+
+DGE <- readRDS("DGE.RDS")
+DGE[["LPS_invnorm_padj"]] <-  invnormcomb_LPS$adjpval
+saveRDS(DGE, file = "DGE.RDS")
+
+DGE <- readRDS("DGE.RDS")
+DGE[["IFNg"]] <-  IFNg$padj
+saveRDS(DGE, file = "DGE.RDS")
+
+DGE <- readRDS("DGE.RDS")
+DGE[["IFNgandLPS"]] <-  IFNgandLPS$padj
+saveRDS(DGE, file = "DGE.RDS")
+
+genes <- rownames(results_all[[1]])   #somehow getting the gene ids (load file first)
+
+allpadj_df <- DGE %>% as.data.frame()
+rownames(allpadj_df) <- genes
+library(tidyverse)
+library(org.Hs.eg.db)
+Symbol <- AnnotationDbi::mapIds(org.Hs.eg.db, keys = substr(genes, 1, 15), keytype = "ENSEMBL", column = "SYMBOL")
+
+minpadj_df <- as.data.frame(apply(allpadj_df, 1, min, na.rm=TRUE))
+
+names(minpadj_df)[names(minpadj_df) == "apply(allpadj_df, 1, min, na.rm = TRUE)"] <- "minimum_padj"
+
+minpadj_df <- minpadj_df %>% filter(minimum_padj > 0) %>% arrange(minimum_padj) %>% top_n(-1000)
+
+
 
