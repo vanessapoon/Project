@@ -228,5 +228,79 @@ DE_genes_all_IL4 <- names(Symbol) [DEresults_IL4$DE.fishercomb == 1 & DEresults_
 DE_genes_up_IL4 <- names(Symbol) [DEresults_IL4$DE.fishercomb == 1 & DEresults_IL4$DE.invnorm == 1 & DEresults_IL4$commonsgn == 1 & !is.na(DEresults_IL4$commonsgn)]
 DE_genes_down_IL4 <- names(Symbol) [DEresults_IL4$DE.fishercomb == 1 & DEresults_IL4$DE.invnorm == 1 & DEresults_IL4$commonsgn == -1 & !is.na(DEresults_IL4$commonsgn)]
 
-#comparing meta and other 2 data sets
+# meta and other 2 data sets altogether
+
+IFNg <- results_all$GSE98368_IFNg
+IFNgandLPS <- results_all$`GSE146028_IFNg+LPS`
+
+IFNg <-  IFNg %>% dplyr::select(log2FoldChange, padj) 
+
+#subsetting up and downregulated gene lists
+IFNg_up<- filter(IFNg, log2FoldChange > "0", !is.na(padj))
+IFNg_down <-  filter(IFNg, log2FoldChange < "0", !is.na(padj))
+
+IFNgandLPS <- IFNgandLPS %>% dplyr::select(log2FoldChange, padj)
+
+IFNgandLPS_up <-  filter(IFNgandLPS, log2FoldChange > "0", !is.na(padj))
+IFNgandLPS_down <-  filter(IFNgandLPS, log2FoldChange < "0", !is.na(padj))
+
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(GenomicFeatures)
+
+gtf <- "gencode.gtf"
+txdb <- makeTxDbFromGFF(gtf)
+saveDb(txdb,"txdb.filename")
+
+txdf <- AnnotationDbi::select(txdb, keys(txdb, "GENEID"), "TXNAME", "GENEID")
+tab <- table(txdf$GENEID)
+txdf$ntx <- tab[match(txdf$GENEID, names(tab))]
+k <- keys(txdb, keytype = "TXNAME")
+tx2gene <- AnnotationDbi::select(txdb, k, "GENEID", "TXNAME")
+
+#adding gene symbols to gene lists
+IFNg_up <-as.data.frame(IFNg_up) %>%
+  mutate(genes = rownames(IFNg_up)) %>%
+  mutate(Symbol = mapIds(
+    org.Hs.eg.db,
+    keys = substr(genes, 1, 15),
+    keytype = "ENSEMBL",
+    column = "SYMBOL"))
+
+as.data.frame(IFNg_down) %>%
+  mutate(genes = rownames(IFNg_down)) %>%
+  mutate(Symbol = mapIds(
+    org.Hs.eg.db,
+    keys = substr(genes, 1, 15),
+    keytype = "ENSEMBL",
+    column = "SYMBOL"))
+
+as.data.frame(IFNgandLPS_up) %>%
+  mutate(genes = rownames(IFNgandLPS_up)) %>%
+  mutate(Symbol = mapIds(
+    org.Hs.eg.db,
+    keys = substr(genes, 1, 15),
+    keytype = "ENSEMBL",
+    column = "SYMBOL"))
+
+as.data.frame(IFNgandLPS_down) %>%
+  mutate(genes = rownames(IFNgandLPS_down)) %>%
+  mutate(Symbol = mapIds(
+    org.Hs.eg.db,
+    keys = substr(genes, 1, 15),
+    keytype = "ENSEMBL",
+    column = "SYMBOL"))
+
+IFNg_up_gene_list <- IFNg_up$genes [IFNg_up$padj < 0.05] 
+IFNg_up_gene_list <- substr(IFNg_up_gene_list, 1, 15) 
+IFNg_up_gene_list
+
+library(clusterProfiler)
+enr_GO <- enrichGO(IFNg_up_gene_list, org.Hs.eg.db, keyType = "ENSEMBL", ont = "BP")
+enr_GO <- setReadable(enr_GO, org.Hs.eg.db, keyType = "ENSEMBL") #converting to gene symbols
+head(enr_GO)
+
+
+library(enrichplot)
+barplot(enr_GO, showCategory=10,  main = "Upregulated pathways in LPS stimulated pathways", xlab="Counts" )
 
