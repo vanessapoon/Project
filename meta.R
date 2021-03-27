@@ -1,5 +1,5 @@
-setwd("~/OneDrive - University of Birmingham/Year 3/Research Project/data") 
-# setwd("data")
+# setwd("~/OneDrive - University of Birmingham/Year 3/Research Project/data") 
+setwd("data")
 getwd()
 
 library(tidyverse)
@@ -250,15 +250,15 @@ library(AnnotationDbi)
 library(org.Hs.eg.db)
 library(GenomicFeatures)
 
-gtf <- "gencode.gtf"
-txdb <- makeTxDbFromGFF(gtf)
-saveDb(txdb,"txdb.filename")
-
-txdf <- AnnotationDbi::select(txdb, keys(txdb, "GENEID"), "TXNAME", "GENEID")
-tab <- table(txdf$GENEID)
-txdf$ntx <- tab[match(txdf$GENEID, names(tab))]
-k <- keys(txdb, keytype = "TXNAME")
-tx2gene <- AnnotationDbi::select(txdb, k, "GENEID", "TXNAME")
+# gtf <- "gencode.gtf"
+# txdb <- makeTxDbFromGFF(gtf)
+# saveDb(txdb,"txdb.filename")
+# 
+# txdf <- AnnotationDbi::select(txdb, keys(txdb, "GENEID"), "TXNAME", "GENEID")
+# tab <- table(txdf$GENEID)
+# txdf$ntx <- tab[match(txdf$GENEID, names(tab))]
+# k <- keys(txdb, keytype = "TXNAME")
+# tx2gene <- AnnotationDbi::select(txdb, k, "GENEID", "TXNAME")
 
 #adding gene symbols to gene lists
 IFNg_up <-as.data.frame(IFNg_up) %>%
@@ -395,12 +395,92 @@ minpadj_df <- as.data.frame(apply(allpadj_df, 1, min, na.rm=TRUE))
 
 names(minpadj_df)[names(minpadj_df) == "apply(allpadj_df, 1, min, na.rm = TRUE)"] <- "minimum_padj"
 
-minpadj_df <- minpadj_df %>% filter(minimum_padj > 0) %>% arrange(minimum_padj) %>% top_n(-1000)
+minpadj_df <- minpadj_df %>% filter(minimum_padj > 0) %>% arrange(minimum_padj) %>% top_n(-2000)
 
 #creating a matrix of log2foldchagnes of top 1000 regulated genes for creating the overview heatmap
 matrix_heatmap_overview <- lfc_df [rownames(lfc_df) %in% rownames(minpadj_df), ] %>% as.matrix()
 
-pheatmap::pheatmap(matrix_heatmap_overview,
-                   show_rownames = FALSE,
-                   scale = "row")
+library(ComplexHeatmap)
+library(dendsort)
+library(dendextend)
+library(circlize)
+library(RColorBrewer)
+library(viridis)
 
+mat_cluster_rows <- hclust(dist(matrix_heatmap_overview), method = "ward.D")
+# mat_cluster_rows <- color_branches(mat_cluster_rows, k = 4)
+plot(mat_cluster_rows, main = "Unsorted Dendrogram", xlab = "", sub = "")
+
+sort_hclust <- function(...) as.hclust(dendsort(as.dendrogram(...), isReverse=TRUE, type="min"))
+
+plot(mat_cluster_rows, main = "Sorted Dendrogram", xlab = "", sub = "")
+mat_cluster_cols <- sort_hclust(hclust(dist(t(matrix_heatmap_overview))), method = "ward.D")
+
+row_cluster <- cutree(mat_cluster_rows, k = 4)
+row_cluster <- plyr::mapvalues(row_cluster, from = c(1,2,3,4), to = c(2,4,1,3))
+row_cluster <- factor(row_cluster)
+
+# Data frame with row cluster annotations.
+mat_row <- data.frame(cluster = as.factor(row_cluster))
+rownames(mat_row) <- names(row_cluster)
+
+# List with colors for each annotation.
+mat_colors <- list(cluster = brewer.pal(length(unique(row_cluster)), "YlGn"))
+names(mat_colors$cluster) <- unique(row_cluster)
+
+# pheatmap::pheatmap(matrix_heatmap_overview,
+#                    show_rownames = FALSE,
+#                    cluster_cols      = mat_cluster_cols,
+#                    cluster_rows      = mat_cluster_rows,
+#                    drop_levels = TRUE,
+#                    annotation_row = mat_row,
+#                    annotation_color=mat_colors,
+#                    scale = "row")
+
+
+enr_GO_clust <- list()
+enr_GO_clust_df <- list()
+
+for (i in 1:length(unique(row_cluster))){
+geneList <- substr(names(row_cluster) [row_cluster == i], 1, 15)
+enr_GO_clust[[i]] <- enrichGO(geneList, ont = "BP", OrgDb = org.Hs.eg.db, keyType = "ENSEMBL",
+                              pvalueCutoff = 0.05)
+enr_GO_clust_df[[i]] <- head(enr_GO_clust[[i]], n = "Inf")
+}
+
+enr_KEGG_clust <- list()
+enr_KEGG_clust_df <- list()
+
+for (i in 1:length(unique(row_cluster))){
+geneList <- substr(names(row_cluster) [row_cluster == i], 1, 15)
+geneList <- mapIds(org.Hs.eg.db, geneList, keytype = "ENSEMBL", column = "ENTREZID",
+                   pvalueCutoff = 0.05)
+enr_KEGG_clust[[i]] <- enrichKEGG(geneList, organism = "hsa")
+enr_KEGG_clust_df[[i]] <- head(enr_KEGG_clust[[i]], n = "Inf")
+}
+
+text_list = list(
+  text1 = "complement activation \nresponse to IFNg & LPS \nmacrophage activation",
+  text2 = "vesicle organisation \nRas and Rab signal transduction \nregulation of cell size",
+  text3 = "autophagy",
+  text4 = "metabolic regulation \nleukocyte differentiation \nECM organisation \nERK1 and ERK2 signaling"
+)
+
+ha = HeatmapAnnotation(bar = anno_empty(row_cluster, border = FALSE,
+                                        width = max_text_width(unlist(text_list)) + unit(4, "mm")),
+                       which = "row")
+
+Heatmap(matrix_heatmap_overview,
+        name = "log2fc", 
+        # col = colorRamp2(c(-10,0,10), brewer.pal(3, "RdYlBu")),
+        cluster_rows = mat_cluster_rows,
+        cluster_columns = mat_cluster_cols,
+        right_annotation = ha,
+        row_split = 4,
+        show_row_names = FALSE)
+for(i in 1:4) {
+  decorate_annotation("bar", slice = i, {
+    grid.rect(x = 0, width = unit(2, "mm"), gp = gpar(fill = i, col = NA), just = "left")
+    grid.text(paste(text_list[[i]], collapse = "\n"), x = unit(4, "mm"), just = "left")
+  })
+}
