@@ -471,10 +471,9 @@ ha = HeatmapAnnotation(bar = anno_empty(row_cluster, border = FALSE,
                        which = "row")
 
 Heatmap(matrix_heatmap_overview,
-        name = "log2fc", 
-        # col = colorRamp2(c(-10,0,10), brewer.pal(3, "RdYlBu")),
         cluster_rows = mat_cluster_rows,
         cluster_columns = mat_cluster_cols,
+        heatmap_legend_param = list(title = expression(paste("log" [2], "-fc"))),
         right_annotation = ha,
         row_split = 4,
         show_row_names = FALSE)
