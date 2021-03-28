@@ -406,6 +406,7 @@ library(dendextend)
 library(circlize)
 library(RColorBrewer)
 library(viridis)
+library(gridtext)
 
 mat_cluster_rows <- hclust(dist(matrix_heatmap_overview), method = "ward.D")
 # mat_cluster_rows <- color_branches(mat_cluster_rows, k = 4)
@@ -436,7 +437,6 @@ names(mat_colors$cluster) <- unique(row_cluster)
 #                    annotation_row = mat_row,
 #                    annotation_color=mat_colors,
 #                    scale = "row")
-
 
 enr_GO_clust <- list()
 enr_GO_clust_df <- list()
@@ -484,3 +484,74 @@ for(i in 1:4) {
     grid.text(paste(text_list[[i]], collapse = "\n"), x = unit(4, "mm"), just = "left")
   })
 }
+
+#heatmap for selected genes with ComplexHeatmap package####
+
+
+# selected gene targets
+# classic m1/ m2 markers
+targets  <- c("TNF", "IL6", "NOS2", "IL12B", "IL23A", "CXCL9", "CXCL10", "CXCL11", "IL10", "ARG1", "CCL17", "CCL22", "TGFB1")
+# bmp antagonists 
+# targets <- c("CHRD", "CHRDL1", "DAND5", "FST", "FSTL1", "FSTL3", "GREM1", "GREM2", "NBL1", "NOG", "SOST", "SOSTDC1", "TWSG1")
+# bmps 
+# targets <- c("BMP2", "BMP4", "BMP7", "BMPR1A", "BMPR1B", "BMPR2", "BMPER", "ENG", "MIF", "CD44", "CD74", "MIF", "KDR")
+
+# targets <- c("GREM1")
+
+lfc_select <- lfc_df [Symbol %in% targets, ] %>% as.matrix()
+rownames(lfc_select) <- Symbol [Symbol %in% targets]
+padj_select <- padj_df [Symbol %in% targets, ] %>% as.matrix()
+rownames(padj_select) <- Symbol [Symbol %in% targets]
+
+
+padj_asterisk <- matrix(case_when(
+  padj_select < 0.001 ~ "***",
+  padj_select < 0.01 ~ "**",
+  padj_select < 0.05 ~ "*"), ncol = ncol(padj_select))
+
+meta <- data.frame(LPS = case_when(apply(DEresults_LPS[,4:6], 1, sum) == 3 ~ apply(cbind(fishcomb_LPS$adjpval, invnormcomb_LPS$adjpval), 1, max),
+                                   apply(DEresults_LPS[,4:6], 1, sum) != 3 ~ 1),
+                   IL4 = case_when(apply(DEresults_IL4[,4:6], 1, sum) == 3 ~ apply(cbind(fishcomb_IL4$adjpval, invnormcomb_IL4$adjpval), 1, max),
+                                   apply(DEresults_IL4[,4:6], 1, sum) != 3 ~ 1)
+                   )
+meta <- meta [Symbol %in% targets, ]
+rownames(meta) <- Symbol [Symbol %in% targets]
+
+ha = rowAnnotation("LPS" = anno_text(case_when(
+                         meta$LPS < 0.001 ~ "***",
+                         meta$LPS < 0.01 ~ "**",
+                         meta$LPS < 0.05 ~ "*",
+                         meta$LPS >= 0.05 ~ "",
+                         is.na(meta$LPS) ~ "" ),
+                         width = unit(10, "mm")),
+                   "IL4" = anno_text(case_when(
+                         meta$IL4 < 0.001 ~ "***",
+                         meta$IL4 < 0.01 ~ "**",
+                         meta$IL4 < 0.05 ~ "*",
+                         meta$IL4 >=0.05 ~ "",
+                         is.na(meta$IL4) ~ ""),
+                         width = unit(10, "mm")),
+                   annotation_name_gp = gpar(fontsize = 11),
+                   annotation_name_side = "top",
+                   annotation_name_rot = 0,
+                   show_annotation_name = TRUE
+                    )
+ha_col = HeatmapAnnotation(Col = anno_empty(which = "column", colnames(lfc_select), border = F, height = unit(5, "mm")))
+
+p2 <- Heatmap(lfc_select,
+        cell_fun = function(j, i, x, y, width, heigth, fill) {
+          if(!is.na(padj_asterisk[i, j]))
+            grid.text(padj_asterisk[i,j], x, y, gp = gpar(fontsize = 10))
+        },
+        heatmap_legend_param = list(title = expression(paste("log" [2], "-fc"))),
+        cluster_rows = FALSE, cluster_columns = FALSE,
+        show_row_dend = FALSE, row_names_side = "left",
+        right_annotation = ha,
+        top_annotation = ha_col
+)
+
+p2@right_annotation@anno_list[["LPS"]]@name_param[["show"]] <- TRUE
+p2@right_annotation@anno_list[["IL4"]]@name_param[["show"]] <- TRUE
+
+p2
+
