@@ -1,4 +1,3 @@
-#always setwd before starting
 setwd("~/OneDrive - University of Birmingham/Year 3/Research Project/data") 
 
 library(tidyverse)
