@@ -36,7 +36,7 @@ Symbol <- AnnotationDbi::mapIds(org.Hs.eg.db, keys = substr(genes, 1, 15), keyty
 
 # selected gene targets
 # classic m1/ m2 markers
-targets  <- c("TNF", "IL6", "NOS2", "IL12B", "IL23A", "CXCL9", "CXCL10", "CXCL11", "IL10", "ARG1", "CCL17", "CCL22", "TGFB1", "CD14", "CD16", "NOS2", "CD163", "CD80", "MRC1", "ITGAM", "IRF5", "IFNG", "STAT1", "IRF4", "STAT3") 
+targets  <- c("TNF", "IL6", "NOS2", "IL12B", "IL23A", "CXCL9", "CXCL10", "CXCL11", "IL10", "ARG1", "CCL17", "CCL22", "TGFB1", "CD14", "CD16", "NOS2", "CD163", "CD80", "MRC1", "ITGAM", "IRF5", "IFNG", "STAT1", "IRF4", "STAT3", "STAT6", "PPARD", "PPARG", "RELA","NFKB1") 
 # bmp antagonists 
 # targets <- c("CER1","CHRD", "CHRDL1", "DAND5", "FST", "FSTL1", "FSTL3", "GREM1", "GREM2", "NBL1", "NOG", "SOST", "SOSTDC1", "TWSG1")
 # bmp pathway
@@ -304,20 +304,53 @@ IFNgandLPS_down_gene_list <- IFNgandLPS_down$genes [IFNgandLPS_down$padj < 0.01]
 IFNgandLPS_down_gene_list <- substr(IFNgandLPS_down_gene_list, 1, 15) 
 IFNgandLPS_down_gene_list
 
+#barplot to show enriched pathways
+
 library(clusterProfiler)
-enr_GO <- enrichGO(DE_genes_up_IL4, org.Hs.eg.db, keyType = "ENSEMBL", ont = "BP")
-enr_GO <- setReadable(enr_GO, org.Hs.eg.db, keyType = "ENSEMBL") #converting to gene symbols
+library(enrichplot)
+
+enr_GO <- enrichGO(DE_genes_up_LPS, org.Hs.eg.db, keyType = "ENSEMBL", ont = "BP")
+enr_GO <- setReadable(enr_GO, org.Hs.eg.db, keyType = "ENSEMBL")
 head(enr_GO)
 
-#barplot to show enriched pathways
-library(enrichplot)
-barplot(enr_GO, showCategory=10, label_format=21) +
-  labs(title = "IL4", x = "Counts") + 
+LPS_up_barplot <- barplot(enr_GO, showCategory=10, label_format=21) +
+  labs(title = "LPS", x = "Counts") + 
   expand_limits(x = c(0, 150)) +
   theme(plot.title = element_text(size = 12, hjust = 0.5),
         axis.text.y = element_text(size=10)) 
 
+enr_GO <- enrichGO(DE_genes_up_IL4, org.Hs.eg.db, keyType = "ENSEMBL", ont = "BP")
+enr_GO <- setReadable(enr_GO, org.Hs.eg.db, keyType = "ENSEMBL")
+head(enr_GO)
 
+IL4_up_barplot <- barplot(enr_GO, showCategory=10, label_format=21) +
+  labs(title = "IL4", x = "Counts") + 
+  expand_limits(x = c(0, 150)) +
+  theme(plot.title = element_text(size = 12, hjust = 0.5),
+        axis.text.y = element_text(size=10))
+
+enr_GO <- enrichGO(IFNg_up_gene_list, org.Hs.eg.db, keyType = "ENSEMBL", ont = "BP")
+enr_GO <- setReadable(enr_GO, org.Hs.eg.db, keyType = "ENSEMBL")
+head(enr_GO)
+
+IFNg_up_barplot <- barplot(enr_GO, showCategory=10, label_format=21) +
+  labs(title = "IFNg", x = "Counts") + 
+  expand_limits(x = c(0, 150)) +
+  theme(plot.title = element_text(size = 12, hjust = 0.5),
+        axis.text.y = element_text(size=10)) 
+
+enr_GO <- enrichGO(IFNgandLPS_up_gene_list, org.Hs.eg.db, keyType = "ENSEMBL", ont = "BP")
+enr_GO <- setReadable(enr_GO, org.Hs.eg.db, keyType = "ENSEMBL")
+head(enr_GO)
+
+IFNgLPS_up_barplot <- barplot(enr_GO, showCategory=10, label_format=21) +
+  labs(title = "IFNg and LPS", x = "Counts") + 
+  expand_limits(x = c(0, 150)) +
+  theme(plot.title = element_text(size = 12, hjust = 0.5),
+        axis.text.y = element_text(size=10)) 
+
+library(egg)
+ggarrange(LPS_up_barplot, IL4_up_barplot, IFNg_up_barplot, IFNgLPS_up_barplot, ncol=2)
 
 #adding gene symbols 
 LPS_invnorm <- as.data.frame(invnormcomb_LPS$adjpval) %>%
@@ -393,7 +426,7 @@ minpadj_df <- as.data.frame(apply(allpadj_df, 1, min, na.rm=TRUE))
 
 names(minpadj_df)[names(minpadj_df) == "apply(allpadj_df, 1, min, na.rm = TRUE)"] <- "minimum_padj"
 
-minpadj_df <- minpadj_df %>% filter(minimum_padj > 0) %>% arrange(minimum_padj) %>% top_n(-2000) 
+minpadj_df <- minpadj_df %>% filter(minimum_padj > 0) %>% arrange(minimumpadj) %>% top_n(-2000) 
 
 #creating matrix of log2foldchagnes of top 1000 regulated genes for creating overview heatmap
 matrix_heatmap_overview <- lfc_df [rownames(lfc_df) %in% rownames(minpadj_df), ] %>% as.matrix()
@@ -487,7 +520,7 @@ for(i in 1:4) {
 
 # selected gene targets
 # classic m1/ m2 markers
-targets  <- c("TNF", "IL6", "NOS2", "IL12B", "IL23A", "CXCL9", "CXCL10", "CXCL11", "IL10", "ARG1", "CCL17", "CCL22", "TGFB1", "CD14", "CD16", "NOS2", "CD163", "CD80", "MRC1", "ITGAM", "IRF5", "IFNG", "STAT1", "IRF4", "STAT3") 
+# targets  <- c("TNF", "IL6", "NOS2", "IL12B", "IL23A", "CXCL9", "CXCL10", "CXCL11", "IL10", "ARG1", "CCL17", "CCL22", "TGFB1", "CD14", "CD16", "NOS2", "CD163", "CD80", "MRC1", "ITGAM", "IRF5", "IFNG", "STAT1", "IRF4", "STAT3", "STAT6", "PPARD", "PPARG", "RELA","NFKB1", "IRF3") 
 # bmp antagonists 
 # targets <- c("CER1","CHRD", "CHRDL1", "DAND5", "FST", "FSTL1", "FSTL3", "GREM1", "GREM2", "NBL1", "NOG", "SOST", "SOSTDC1", "TWSG1")
 # bmp pathway
@@ -553,4 +586,4 @@ p3 <- Heatmap(lfc_select,
 p3@right_annotation@anno_list[["LPS"]]@name_param[["show"]] <- TRUE
 p3@right_annotation@anno_list[["IL4"]]@name_param[["show"]] <- TRUE
 
-p3
+p3 
