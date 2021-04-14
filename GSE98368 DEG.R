@@ -30,7 +30,6 @@ gtf <- "gencode.gtf"
 txdb <- makeTxDbFromGFF(gtf)
 saveDb(txdb,"txdb.filename")
 
-
 txdf <- AnnotationDbi::select(txdb, keys(txdb, "GENEID"), "TXNAME", "GENEID")
 tab <- table(txdf$GENEID)
 txdf$ntx <- tab[match(txdf$GENEID, names(tab))]
